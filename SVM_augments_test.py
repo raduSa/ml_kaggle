@@ -12,7 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
 # --- Config ---
-IMAGE_SIZE = (64, 64)  # Increased size for better HOG features
+IMAGE_SIZE = (32, 32)  # Increased size for better HOG features
 
 
 # === IMAGE AUGMENTATION FUNCTIONS === #
@@ -49,15 +49,13 @@ def add_noise(img, mode='gaussian'):
 
 # === HOG FEATURE EXTRACTOR === #
 
-def extract_hog_features_from_pil(img):
-    img = img.resize(IMAGE_SIZE)
-    img_np = np.array(img)
-    return hog(img_np, pixels_per_cell=(8, 8), cells_per_block=(2, 2), channel_axis=-1)
+def extract_hog_features_from_pil(features):
+    return hog(features, pixels_per_cell=(8, 8), cells_per_block=(2, 2), channel_axis=-1)
 
 
 # === DATA LOADER WITH AUGMENTATION === #
 
-def load_data_with_augmentation(csv_path, image_dir, augment_funcs=None):
+def load_data_with_augmentation(csv_path, image_dir, augment_funcs=None, hog=False):
     df = pd.read_csv(csv_path)
     X, y = [], []
 
@@ -73,12 +71,18 @@ def load_data_with_augmentation(csv_path, image_dir, augment_funcs=None):
             for aug in augment_funcs:
                 for _ in range(AUGMENT_REPEATS):
                     aug_img = aug(img)
-                    features = extract_hog_features_from_pil(aug_img)
+                    aug_img = aug_img.resize(IMAGE_SIZE)
+                    features = np.array(aug_img).flatten()
+                    if hog:
+                        features = extract_hog_features_from_pil(aug_img)
                     X.append(features)
                     y.append(label)
 
         # Also include original
-        features = extract_hog_features_from_pil(img)
+        img = img.resize(IMAGE_SIZE)
+        features = np.array(img).flatten()
+        if hog:
+            features = extract_hog_features_from_pil(features)
         X.append(features)
         y.append(label)
 
@@ -88,15 +92,17 @@ def load_data_with_augmentation(csv_path, image_dir, augment_funcs=None):
 
 augmentations = [
     random_rotation,
-    horizontal_flip,
-    color_jitter,
+    #horizontal_flip,
+    #color_jitter,
     affine_transform,
-    add_noise
+    #add_noise
 ]
 
 X_train, y_train = load_data_with_augmentation("train.csv", "train", augment_funcs=augmentations)
 X_val, y_val = load_data_with_augmentation("validation.csv", "validation")  # No augmentation for validation
 
+print(f"Training data")
+print(X_train, X_train.shape)
 
 # Standardize features (important for SVM)
 scaler = StandardScaler()
@@ -104,7 +110,7 @@ X_train_scaled = scaler.fit_transform(X_train)
 X_val_scaled = scaler.transform(X_val)
 
 # Train SVM
-svm_model = SVC(kernel='rbf', C=1.0, gamma='scale')  # Default RBF kernel
+svm_model = SVC(kernel='rbf', C=10, gamma='scale')
 svm_model.fit(X_train_scaled, y_train)
 
 # Predict and evaluate
