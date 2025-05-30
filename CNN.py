@@ -9,6 +9,7 @@ from PIL import Image
 from keras.src.layers import MaxPooling2D
 from keras.utils import to_categorical
 from keras.callbacks import ModelCheckpoint, EarlyStopping
+import tensorflow as tf
 
 # test1 - 0.64 x 0.9315 -> overfit
 model_1 = Sequential([
@@ -63,7 +64,7 @@ model_3 = Sequential([
 
     Flatten(),
 
-    Dense(100, activation='relu'),
+    Dense(128, activation='relu'),
     Dense(100, activation='relu'),
     Dropout(0.2),
     Dense(5, activation='softmax'),
@@ -103,6 +104,11 @@ Y_train = Y_train.reshape(len(Y_train), 1)
 X_val = X_val.reshape(len(X_val), 100, 100, 3)
 Y_val = Y_val.reshape(len(Y_val), 1)
 
+# Preprocessing (subtract mean)
+mean = X_train.mean(axis=0)
+X_train = X_train - mean
+X_val = X_val - mean
+
 Y_train = to_categorical(Y_train, num_classes=5)
 Y_val = to_categorical(Y_val, num_classes=5)
 
@@ -111,8 +117,31 @@ print("Shape of y_train:", Y_train.shape)
 print("Shape of X_val:", X_val.shape)
 print("Shape of y_val:", Y_val.shape)
 
+# Prepare data
+batch_size = 64
+
+train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
+    rescale=1./255,              # Normalize pixel values
+    rotation_range=20,           # Random rotation in degrees
+    width_shift_range=0.1,       # Horizontal shift (10%)
+    height_shift_range=0.1,      # Vertical shift (10%)
+    zoom_range=0.1,              # Random zoom
+    horizontal_flip=True,        # Random horizontal flip
+    fill_mode='nearest'          # Fill in newly created pixels
+)
+test_datagen = tf.keras.preprocessing.image.ImageDataGenerator(rescale=1./255)
+
+train_generator = train_datagen.flow(X_train, Y_train, batch_size=batch_size)
+validation_generator = test_datagen.flow(X_val, Y_val, batch_size=batch_size)
+
 # build model
 model = build_model(model_3)
-model.fit(X_train, Y_train, batch_size=64, epochs=50, validation_data=(X_val, Y_val), callbacks=[early_stopping])
+
+model.fit(
+        train_generator,
+        epochs=50,
+        validation_data=validation_generator,
+        callbacks=[early_stopping])
 
 model.evaluate(X_val, Y_val)
+model.save_weights('first_try.h5')  # always save your weights after training or during training
