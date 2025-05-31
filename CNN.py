@@ -4,6 +4,7 @@ import pandas as pd
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Flatten, Conv2D
 from keras.optimizers import Adam
+from keras.regularizers import l2
 import numpy as np
 from PIL import Image
 from keras.src.layers import MaxPooling2D
@@ -33,7 +34,7 @@ model_2 = Sequential([
     MaxPooling2D((2, 2)),
     Dropout(0.2),
 
-    Conv2D(64, (3, 3), padding='same', activation='relu', input_shape=(100, 100, 3)),
+    Conv2D(64, (3, 3), padding='same', activation='relu'),
     MaxPooling2D((2, 2)),
     Dropout(0.2),
 
@@ -51,15 +52,15 @@ model_3 = Sequential([
     MaxPooling2D((2, 2)),
     Dropout(0.2),
 
-    Conv2D(64, (3, 3), padding='same', activation='relu', input_shape=(100, 100, 3)),
+    Conv2D(64, (3, 3), padding='same', activation='relu'),
     MaxPooling2D((2, 2)),
     Dropout(0.2),
 
-    Conv2D(64, (3, 3), padding='same', activation='relu', input_shape=(100, 100, 3)),
+    Conv2D(64, (3, 3), padding='same', activation='relu'),
     MaxPooling2D((2, 2)),
     Dropout(0.2),
 
-    Conv2D(64, (3, 3), padding='same', activation='relu', input_shape=(100, 100, 3)),
+    Conv2D(64, (3, 3), padding='same', activation='relu'),
     MaxPooling2D((2, 2)),
     Dropout(0.2),
 
@@ -74,28 +75,58 @@ model_3 = Sequential([
 model_4 = Sequential([
     Conv2D(64, (3, 3), padding='same', activation='relu', input_shape=(100, 100, 3)),
     BatchNormalization(),
-    Conv2D(64, (3, 3), padding='same', activation='relu', input_shape=(100, 100, 3)),
-    BatchNormalization(),
     MaxPooling2D((2, 2)),
-    Dropout(0.2),
+    Dropout(0.4),
 
-    Conv2D(64, (3, 3), padding='same', activation='relu', input_shape=(100, 100, 3)),
-    BatchNormalization(),
-    Dropout(0.2),
-    Conv2D(64, (3, 3), padding='same', activation='relu', input_shape=(100, 100, 3)),
+    Conv2D(64, (3, 3), padding='same', activation='relu'),
     BatchNormalization(),
     MaxPooling2D((2, 2)),
-    Dropout(0.2),
+    Dropout(0.3),
 
-    Conv2D(64, (3, 3), padding='same', activation='relu', input_shape=(100, 100, 3)),
+    Conv2D(64, (3, 3), padding='same', activation='relu'),
+    BatchNormalization(),
     MaxPooling2D((2, 2)),
-    Dropout(0.2),
+    Dropout(0.3),
+
+    Conv2D(64, (3, 3), padding='same', activation='relu'),
+    BatchNormalization(),
+    MaxPooling2D((2, 2)),
+    Dropout(0.3),
 
     Flatten(),
 
     Dense(128, activation='relu'),
     Dense(100, activation='relu'),
-    Dropout(0.2),
+    Dropout(0.3),
+    Dense(5, activation='softmax'),
+])
+
+model_5 = Sequential([
+    Conv2D(64, (3, 3), kernel_regularizer=l2(0.001), padding='same', activation='relu', input_shape=(100, 100, 3)),
+    BatchNormalization(),
+    MaxPooling2D((2, 2)),
+    Dropout(0.4),
+
+    Conv2D(64, (3, 3), kernel_regularizer=l2(0.001), padding='same', activation='relu'),
+    BatchNormalization(),
+    MaxPooling2D((2, 2)),
+    Dropout(0.3),
+
+    Conv2D(64, (3, 3), kernel_regularizer=l2(0.001), padding='same', activation='relu'),
+    BatchNormalization(),
+    MaxPooling2D((2, 2)),
+    Dropout(0.3),
+
+    Conv2D(64, (3, 3), kernel_regularizer=l2(0.001), padding='same', activation='relu'),
+    BatchNormalization(),
+    MaxPooling2D((2, 2)),
+    Dropout(0.3),
+
+    Flatten(),
+
+    Dense(128, activation='relu', kernel_regularizer=l2(0.001)),
+    Dense(100, activation='relu', kernel_regularizer=l2(0.001)),
+    Dropout(0.3),
     Dense(5, activation='softmax'),
 ])
 
@@ -114,7 +145,7 @@ def load_data(csv_path, image_dir):
     return np.array(X), np.array(y)
 
 def build_model(model):
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=Adam(learning_rate=1e-3), loss='categorical_crossentropy', metrics=['accuracy'])
     return model
 
 early_stopping = EarlyStopping(
@@ -147,7 +178,7 @@ print("Shape of X_val:", X_val.shape)
 print("Shape of y_val:", Y_val.shape)
 
 # Prepare data
-batch_size = 64
+batch_size = 32
 
 train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
     rescale=1./255,              # Normalize pixel values
@@ -161,7 +192,7 @@ train_generator = train_datagen.flow(X_train, Y_train, batch_size=batch_size)
 validation_generator = test_datagen.flow(X_val, Y_val, batch_size=batch_size)
 
 # build model
-model = build_model(model_4)
+model = build_model(model_5)
 
 model.fit(
         train_generator,
@@ -170,5 +201,7 @@ model.fit(
         callbacks=[early_stopping]
 )
 
+#model.fit(X_train, Y_train, batch_size=32, epochs=50, validation_data=(X_val, Y_val), callbacks=[early_stopping])
+
 model.evaluate(X_val / 255.0, Y_val / 255.0)
-model.save_weights('first_try.weights.h5')
+model.save_weights('trd.weights.h5')
